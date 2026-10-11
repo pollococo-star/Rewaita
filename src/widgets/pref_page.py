@@ -34,7 +34,7 @@ class PrefPage(Gtk.Box):
             margin_end=12,
         )
 
-        if(not "GNOME" in GLib.getenv("XDG_CURRENT_DESKTOP") or ""):
+        if not ("GNOME" in (GLib.getenv("XDG_CURRENT_DESKTOP") or "")):
             self.append(Adw.Clamp(maximum_size=800, child=AccentBox(win)))
         self.append(OptionsBox(win))
         prefs_page = Adw.PreferencesGroup()
