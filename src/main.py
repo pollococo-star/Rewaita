@@ -19,22 +19,25 @@
 
 import sys, gi, os, re
 
-gi.require_version('Gtk', '4.0')
-gi.require_version('Adw', '1')
-gi.require_version('Xdp', '1.0')
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+gi.require_version("Xdp", "1.0")
 
 from gi.repository import Gtk, Gdk, Gio, Adw, GLib, Xdp, GObject
 from .utils import Preferences, change_autostart
 from .window import RewaitaWindow
 
+
 class RewaitaApplication(Adw.Application):
     def __init__(self):
-        super().__init__(application_id='io.github.swordpuffin.rewaita',
-                         flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
-                         resource_base_path='/io/github/swordpuffin/rewaita')
-        self.create_action('quit', lambda *_: self.quit(), ['<primary>q'])
-        self.create_action('about', self.on_about_action)
-        self.create_action('guide', self.on_guide_clicked)
+        super().__init__(
+            application_id="io.github.swordpuffin.rewaita",
+            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
+            resource_base_path="/io/github/swordpuffin/rewaita",
+        )
+        self.create_action("quit", lambda *_: self.quit(), ["<primary>q"])
+        self.create_action("about", self.on_about_action)
+        self.create_action("guide", self.on_guide_clicked)
 
         self.add_main_option(
             "background",
@@ -76,6 +79,9 @@ class RewaitaApplication(Adw.Application):
             win.window_control = all_prefs["window-controls"]
             win.modify_gtk3_theme = all_prefs["modify-gtk3-theme"]
             win.modify_gnome_shell = all_prefs["modify-gnome-shell"]
+            win.modify_cinnamon_shell = all_prefs.get(
+                "modify-cinnamon-shell", all_prefs["modify-gnome-shell"]
+            )
             win.run_in_background = all_prefs["run-in-background"]
             win.transparency = all_prefs["transparency"]
             win.borders = all_prefs["window"]
@@ -93,7 +99,7 @@ class RewaitaApplication(Adw.Application):
             self.grab_prefs()
 
     def on_close_request(self, window, *args):
-        if(window.run_in_background):
+        if window.run_in_background:
             window.hide()
             return True
 
@@ -103,14 +109,14 @@ class RewaitaApplication(Adw.Application):
             win = RewaitaWindow(application=self)
 
         win.connect("close-request", self.on_close_request)
-        if(win.run_in_background):
+        if win.run_in_background:
             win.portal.request_background(
                 None,
                 "Automatic transitions between light/dark mode",
                 None,
                 Xdp.BackgroundFlags.ACTIVATABLE,
                 None,
-                self.on_background_response
+                self.on_background_response,
             )
 
         win.present()
@@ -118,13 +124,20 @@ class RewaitaApplication(Adw.Application):
         self.settings.connect("changed", self.on_settings_changed, win)
 
     def on_settings_changed(self, settings, namespace, key, value, win):
-        if(win.reloading):
+        if win.reloading:
             return
-        if(namespace == "org.freedesktop.appearance" and key == "color-scheme" or namespace == "org.gnome.desktop.interface" and key == "accent-color"):
+        # Parentheses required: `and` binds tighter than `or`, but we want clear intent
+        if (namespace == "org.freedesktop.appearance" and key == "color-scheme") or (
+            namespace == "org.gnome.desktop.interface" and key == "accent-color"
+        ):
+            # GTK4 dual media-query CSS already covers scheme switches for apps;
+            # still regenerate shell / gtk3 for the active palette and accents.
             win.on_theme_selected()
 
     def on_guide_clicked(self, action, _):
-        builder = Gtk.Builder().new_from_resource('/io/github/swordpuffin/rewaita/widgets/guide_dialog.ui')
+        builder = Gtk.Builder().new_from_resource(
+            "/io/github/swordpuffin/rewaita/widgets/guide_dialog.ui"
+        )
         guide_dialog = builder.get_object("GuideDialog")
         guide_dialog.present(parent=self.props.active_window)
         self.clipboard = Gdk.Display.get_default().get_clipboard()
@@ -134,18 +147,28 @@ class RewaitaApplication(Adw.Application):
             self.clipboard.set(text)
 
             button.add_css_class("suggested-action")
+
             def remove_success():
                 button.remove_css_class("suggested-action")
+
             GLib.timeout_add(1000, remove_success)
 
-        builder.get_object("copy_button_gtk3").connect("clicked", on_copy, builder.get_object("gtk3_entry"))
-        builder.get_object("copy_button_gtk4").connect("clicked", on_copy, builder.get_object("gtk4_entry"))
-        builder.get_object("copy_button_fp").connect("clicked", on_copy, builder.get_object("fp_entry"))
-        builder.get_object("copy_button_ln").connect("clicked", on_copy, builder.get_object("ln_entry"))
+        builder.get_object("copy_button_gtk3").connect(
+            "clicked", on_copy, builder.get_object("gtk3_entry")
+        )
+        builder.get_object("copy_button_gtk4").connect(
+            "clicked", on_copy, builder.get_object("gtk4_entry")
+        )
+        builder.get_object("copy_button_fp").connect(
+            "clicked", on_copy, builder.get_object("fp_entry")
+        )
+        builder.get_object("copy_button_ln").connect(
+            "clicked", on_copy, builder.get_object("ln_entry")
+        )
 
     def on_background_response(self, portal, result):
         success = portal.request_background_finish(result)
-        if(success):
+        if success:
             print("Background permission granted")
         else:
             print("Background permission denied")
@@ -159,25 +182,40 @@ class RewaitaApplication(Adw.Application):
 
         self.activate()
 
-        if("background" in options):
+        if "background" in options:
             win.emit("close-request")
 
         theme_type = "light" if win.pref in [0, 2] else "dark"
 
-        if("theme" in options):
-            for arg in sys.argv: # For whatever reason, options doesn't include the value of --theme=, just that it is a flag
-                if(arg.startswith("--theme=")):
+        if "theme" in options:
+            for arg in sys.argv:  # For whatever reason, options doesn't include the value of --theme=, just that it is a flag
+                if arg.startswith("--theme="):
                     theme = arg.split("=")[1]
                     self.set_theme(win, theme, theme_type)
                     sys.exit(0)
 
-        if("list" in options):
-            print(list(map(self.adjust_theme_name, os.listdir(os.path.join(win.data_dir, theme_type)))))
+        if "list" in options:
+            print(
+                list(
+                    map(
+                        self.adjust_theme_name,
+                        os.listdir(os.path.join(win.data_dir, theme_type)),
+                    )
+                )
+            )
             sys.exit(0)
 
     def adjust_theme_name(self, theme_name):
-        emoji_pattern = re.compile(r"[\s\u200d\ufe0f]*[\U00010000-\U0010FFFF\u2600-\u2B55]+[\s\u200d\ufe0f]*", flags=re.UNICODE)
-        new_theme_name = emoji_pattern.sub('', theme_name).replace(" ", "-").replace(".css", "").lower()
+        emoji_pattern = re.compile(
+            r"[\s\u200d\ufe0f]*[\U00010000-\U0010FFFF\u2600-\u2B55]+[\s\u200d\ufe0f]*",
+            flags=re.UNICODE,
+        )
+        new_theme_name = (
+            emoji_pattern.sub("", theme_name)
+            .replace(" ", "-")
+            .replace(".css", "")
+            .lower()
+        )
         return new_theme_name
 
     def set_theme(self, win, theme_name, theme_type):
@@ -186,20 +224,24 @@ class RewaitaApplication(Adw.Application):
 
         for theme in theme_files:
             adjusted_name = self.adjust_theme_name(theme)
-            if(adjusted_name == comparison_name):
+            if adjusted_name == comparison_name:
                 win.on_theme_button_clicked(None, theme, theme_type)
                 return
-        print(f"Theme: {theme_name}, was not found\nUse --list to get all available themes")
+        print(
+            f"Theme: {theme_name}, was not found\nUse --list to get all available themes"
+        )
 
     def on_about_action(self, *args):
-        about = Adw.AboutDialog(application_name='Rewaita',
-                                application_icon='io.github.swordpuffin.rewaita',
-                                developer_name='Nathan Perlman',
-                                version='1.1.8',
-                                developers=['Nathan Perlman'],
-                                copyright='© 2026 Nathan Perlman')
+        about = Adw.AboutDialog(
+            application_name="Rewaita",
+            application_icon="io.github.swordpuffin.rewaita",
+            developer_name="Nathan Perlman",
+            version="1.1.8",
+            developers=["Nathan Perlman"],
+            copyright="© 2026 Nathan Perlman",
+        )
         # Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
-        about.set_translator_credits(_('translator-credits'))
+        about.set_translator_credits(_("translator-credits"))
         about.present(self.props.active_window)
 
     def create_action(self, name, callback, shortcuts=None):
@@ -208,6 +250,7 @@ class RewaitaApplication(Adw.Application):
         self.add_action(action)
         if shortcuts:
             self.set_accels_for_action(f"app.{name}", shortcuts)
+
 
 def main(version):
     app = RewaitaApplication()

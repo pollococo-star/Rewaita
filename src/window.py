@@ -18,7 +18,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os, gi, re
-gi.require_version('Xdp', '1.0')
+
+gi.require_version("Xdp", "1.0")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Xdp
 from collections import defaultdict
 from pathlib import Path
@@ -28,11 +29,13 @@ from .theme_page import ThemePage
 from .pref_page import PrefPage
 from .window_control_box import WindowControlBox
 
+
 def read_color_scheme(settings):
     try:
         return settings.read_uint("org.freedesktop.appearance", "color-scheme")
     except:
         return 1
+
 
 if "GNOME" in (GLib.getenv("XDG_CURRENT_DESKTOP") or ""):
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
@@ -40,9 +43,9 @@ if "GNOME" in (GLib.getenv("XDG_CURRENT_DESKTOP") or ""):
         bus,
         Gio.DBusProxyFlags.NONE,
         None,
-        'org.gnome.Shell.Extensions',
-        '/org/gnome/Shell/Extensions',
-        'org.gnome.Shell.Extensions'
+        "org.gnome.Shell.Extensions",
+        "/org/gnome/Shell/Extensions",
+        "org.gnome.Shell.Extensions",
     )
 
 if "Cinnamon" in (GLib.getenv("XDG_CURRENT_DESKTOP") or ""):
@@ -51,19 +54,29 @@ if "Cinnamon" in (GLib.getenv("XDG_CURRENT_DESKTOP") or ""):
         bus,
         Gio.DBusProxyFlags.NONE,
         None,
-        'org.Cinnamon',
-        '/org/Cinnamon',
-        'org.Cinnamon'
+        "org.Cinnamon",
+        "/org/Cinnamon",
+        "org.Cinnamon",
     )
 
-def reset_gnome_shell():
-    proxy.call_sync("DisableExtension",
-        GLib.Variant("(s)", ("user-theme@gnome-shell-extensions.gcampax.github.com",)),
-        Gio.DBusCallFlags.NONE, -1, None)
 
-    proxy.call_sync("EnableExtension",
+def reset_gnome_shell():
+    proxy.call_sync(
+        "DisableExtension",
         GLib.Variant("(s)", ("user-theme@gnome-shell-extensions.gcampax.github.com",)),
-        Gio.DBusCallFlags.NONE, -1, None)
+        Gio.DBusCallFlags.NONE,
+        -1,
+        None,
+    )
+
+    proxy.call_sync(
+        "EnableExtension",
+        GLib.Variant("(s)", ("user-theme@gnome-shell-extensions.gcampax.github.com",)),
+        Gio.DBusCallFlags.NONE,
+        -1,
+        None,
+    )
+
 
 def reset_cinnamon():
     proxy.call_sync(
@@ -71,16 +84,18 @@ def reset_cinnamon():
         GLib.Variant("(b)", (True,)),
         Gio.DBusCallFlags.NONE,
         -1,
-        None
+        None,
     )
+
 
 gtk3_config_dir = os.path.join(os.path.expanduser("~/.config"), "gtk-3.0")
 gtk4_config_dir = os.path.join(os.path.expanduser("~/.config"), "gtk-4.0")
 gnome_shell_dir = os.path.join(GLib.getenv("HOME"), ".local", "share", "themes")
 
-@Gtk.Template(resource_path='/io/github/swordpuffin/rewaita/window.ui')
+
+@Gtk.Template(resource_path="/io/github/swordpuffin/rewaita/window.ui")
 class RewaitaWindow(Adw.ApplicationWindow):
-    __gtype_name__ = 'RewaitaWindow'
+    __gtype_name__ = "RewaitaWindow"
 
     main_box = Gtk.Template.Child()
     switcher = Gtk.Template.Child()
@@ -101,17 +116,28 @@ class RewaitaWindow(Adw.ApplicationWindow):
         super().__init__(**kwargs)
 
         css_provider = Gtk.CssProvider()
-        css_provider.load_from_data(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "styles.css")).read())
+        css_provider.load_from_data(
+            open(
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "styles.css")
+            ).read()
+        )
         Gtk.StyleContext.add_provider_for_display(
             Gdk.Display.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_USER
         )
 
-        #Makes necessary directories
+        # Makes necessary directories
         for path in [gtk3_config_dir, gtk4_config_dir, gnome_shell_dir]:
             os.makedirs(path, exist_ok=True)
 
-        if(self.window_control != "default"):
-            self.window_control_css = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "window-controls", "gtk4", f"{self.window_control}.css")).read()
+        if self.window_control != "default":
+            self.window_control_css = open(
+                os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    "window-controls",
+                    "gtk4",
+                    f"{self.window_control}.css",
+                )
+            ).read()
         self.portal = Xdp.Portal()
         self.settings = self.portal.get_settings()
         self.pref = read_color_scheme(self.settings)
@@ -119,7 +145,9 @@ class RewaitaWindow(Adw.ApplicationWindow):
         scroll_box = Gtk.ScrolledWindow(hexpand=True)
         self.main_box.append(scroll_box)
 
-        self.controls = self.endbox.get_parent().get_last_child() #Gets the window controls
+        self.controls = (
+            self.endbox.get_parent().get_last_child()
+        )  # Gets the window controls
         self.theme_page = ThemePage(self)
         self.theme_page.append(WindowControlBox(self, self.window_control))
         self.custom_page = CustomPage(self)
@@ -127,9 +155,21 @@ class RewaitaWindow(Adw.ApplicationWindow):
         stack = Adw.ViewStack(enable_transitions=True, vhomogeneous=False)
         stack.connect("notify::visible-child", self.on_page_changed)
         self.switcher.set_stack(stack)
-        stack.add_titled_with_icon(self.theme_page, "theming", _("Theming"), "brush-symbolic")
-        stack.add_titled_with_icon(Adw.Clamp(child=self.custom_page, maximum_size=850), "custom", _("Custom"), "hammer-symbolic")
-        stack.add_titled_with_icon(Adw.Clamp(child=PrefPage(self), maximum_size=850), "pref", _("Fine Tune"), "emblem-system-symbolic")
+        stack.add_titled_with_icon(
+            self.theme_page, "theming", _("Theming"), "brush-symbolic"
+        )
+        stack.add_titled_with_icon(
+            Adw.Clamp(child=self.custom_page, maximum_size=850),
+            "custom",
+            _("Custom"),
+            "hammer-symbolic",
+        )
+        stack.add_titled_with_icon(
+            Adw.Clamp(child=PrefPage(self), maximum_size=850),
+            "pref",
+            _("Fine Tune"),
+            "emblem-system-symbolic",
+        )
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.append(stack)
@@ -144,7 +184,7 @@ class RewaitaWindow(Adw.ApplicationWindow):
         self.add_action(edit)
 
     def on_page_changed(self, stack, _):
-        if(stack.get_visible_child_name() != "theming"):
+        if stack.get_visible_child_name() != "theming":
             self.delete_button.set_visible(False)
             self.edit_button.set_visible(False)
         else:
@@ -154,7 +194,7 @@ class RewaitaWindow(Adw.ApplicationWindow):
     def on_theme_selected(self):
         self.reloading = True
         self.pref = read_color_scheme(self.settings)
-        if(self.pref == 1):
+        if self.pref == 1:
             theme_name = self.dark_theme
             theme_type = "dark"
         else:
@@ -162,73 +202,101 @@ class RewaitaWindow(Adw.ApplicationWindow):
             theme_type = "light"
 
         self.save_prefs()
+        ensure_config_dirs()
+        os.makedirs(gtk4_config_dir, exist_ok=True)
 
-        extra_css_string = ""
-        for item in self.extra_css:
-            extra_css_string += item
-        extras = self.window_control_css + extra_css_string
-        if(theme_name == "default"):
-            set_to_default(gtk4_config_dir, theme_type, reset_gnome_shell, reset_cinnamon, [extras, self.window_control], self.modify_gtk3_theme)
-            return
-
-        theme_file = os.path.join(self.data_dir, theme_type, theme_name)
+        extra_css_string = "".join(self.extra_css)
+        base_extras = self.window_control_css + extra_css_string
         self.controls.set_css_classes([self.window_control])
 
-        try: # I'd rather it just not do anything than fail, it's this stupid symlink system I have going on
-            gtk_css = open(theme_file).read()
-        except FileNotFoundError:
-            print(f"Could not find: {theme_file}")
-            return
-        
-        open_toast(self, _("Active Theme Set To: ") + theme_name.replace(".css", ""))
-    
-        color_pattern = r'--([a-z0-9-]+)\s*:\s*(#[a-fA-F0-9]+|[a-z0-9_-]+(?:\([^)]*\))?)\s*;'
+        # Always load BOTH schemes so GTK4 can switch via media queries
+        light_css = load_theme_file_css(self.data_dir, "light", self.light_theme)
+        dark_css = load_theme_file_css(self.data_dir, "dark", self.dark_theme)
+        active_css = dark_css if theme_type == "dark" else light_css
+
+        # Parse colors from the active scheme (shell / gtk3 still need the current palette)
+        color_pattern = (
+            r"--([a-z0-9-]+)\s*:\s*(#[a-fA-F0-9]+|[a-z0-9_-]+(?:\([^)]*\))?)\s*;"
+        )
         references = defaultdict(list)
         colors = dict()
-
-        for match in re.finditer(color_pattern, gtk_css):
+        for match in re.finditer(color_pattern, active_css):
             name, value = match.groups()
-            if(value.startswith('@')):
-                ref_name = value[1:]
-                references[ref_name].append(name)
+            if value.startswith("@"):
+                references[value[1:]].append(name)
             else:
                 colors[name] = value
-
         for ref_name, dependent_names in references.items():
-            if(ref_name in colors):
+            if ref_name in colors:
                 for name in dependent_names:
                     colors[name] = colors[ref_name]
 
-        accent_color, accent_fg = get_accent_color(colors, self)
-        colors["accent-color"] = accent_color
-        colors["accent-fg-color"] = accent_fg
-        extras = "\n" + extras + f"\n@define-color accent_bg_color {accent_color};\n@define-color accent_fg_color {accent_fg};"
+        accent_color, accent_fg = (
+            get_accent_color(colors, self) if colors else ("#3584e4", "#EEEEEE")
+        )
+        if colors:
+            colors["accent-color"] = accent_color
+            colors["accent-fg-color"] = accent_fg
+        accent_extras = (
+            f"\n@define-color accent_bg_color {accent_color};\n"
+            f"@define-color accent_fg_color {accent_fg};\n"
+            f":root {{ --accent-bg-color: {accent_color}; --accent-fg-color: {accent_fg}; }}\n"
+        )
+        extras = "\n" + base_extras + accent_extras
 
+        display_name = (
+            theme_name.replace(".css", "") if theme_name != "default" else "Default"
+        )
+        open_toast(self, _("Active Theme Set To: ") + display_name)
+
+        # GTK4: dual light+dark CSS with prefers-color-scheme (issues #95 / #105)
+        dual_css = build_media_query_css(light_css, dark_css, extras)
         try:
-            # Uses a companion file
             companion = os.path.join(gtk4_config_dir, "rewaita.css")
             main_file = os.path.join(gtk4_config_dir, "gtk.css")
-            create_companion_file(companion, main_file, gtk_css + extras)
-
-            # Resolves a conflict with the window controls not changing with the companion file
-            main_file_text = Path(main_file).read_text()
-            new_text = main_file_text.replace(".rewaita-display", "windowcontrols")
-            Path(main_file).write_text(new_text)
+            create_companion_file(companion, main_file, dual_css)
+            if os.path.isfile(main_file) and not os.path.islink(main_file):
+                main_file_text = Path(main_file).read_text()
+                new_text = main_file_text.replace(".rewaita-display", "windowcontrols")
+                Path(main_file).write_text(new_text)
         except Exception as e:
-            print(f"Error moving file: {e}")
+            print(f"Error writing GTK4 theme: {e}")
+            open_toast(self, _("Could not apply GTK4 theme: ") + str(e))
 
-        add_css_provider(open(theme_file).read() + extras, (accent_color, accent_fg))
-        parse_gtk_theme(
-            colors,
-            reset_gnome_shell,
-            reset_cinnamon
-        )
-        add_gtk3_window_controls(self.window_control, "")
+        add_css_provider(active_css + extras, (accent_color, accent_fg))
+
+        if colors:
+            parse_gtk_theme(
+                colors, reset_gnome_shell, reset_cinnamon, self.window_control
+            )
+        else:
+            # Default @define-color themes have no :root vars — dual CSS already written above
+            set_to_default(
+                gtk4_config_dir,
+                theme_type,
+                reset_gnome_shell,
+                reset_cinnamon,
+                [extras, self.window_control],
+                self.modify_gtk3_theme,
+                data_dir=self.data_dir,
+                light_theme=self.light_theme,
+                dark_theme=self.dark_theme,
+            )
+            hot_reload(self)
+            return
+
         hot_reload(self)
 
     def on_window_control_clicked(self, button, control_file, window, flowbox):
-        if(control_file != "default"):
-            self.window_control_css = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "window-controls", "gtk4", f"{control_file}.css")).read()
+        if control_file != "default":
+            self.window_control_css = open(
+                os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    "window-controls",
+                    "gtk4",
+                    f"{control_file}.css",
+                )
+            ).read()
         else:
             self.window_control_css = ""
         for control in flowbox:
@@ -240,33 +308,46 @@ class RewaitaWindow(Adw.ApplicationWindow):
         self.on_theme_selected()
 
     def on_theme_button_clicked(self, button, theme_name, theme_type):
-        if(theme_type == "dark" and theme_name != "Default"):
+        if theme_type == "dark" and theme_name != "Default":
             self.dark_theme = theme_name
-        elif(theme_type == "light" and theme_name != "Default"):
+        elif theme_type == "light" and theme_name != "Default":
             self.light_theme = theme_name
-        elif(theme_type == "dark" and theme_name == "Default"):
+        elif theme_type == "dark" and theme_name == "Default":
             self.dark_theme = "default"
-        elif(theme_type == "light" and theme_name == "Default"):
+        elif theme_type == "light" and theme_name == "Default":
             self.light_theme = "default"
 
-        if(theme_type == "light" and self.pref in [0, 2] or theme_type == "dark" and self.pref == 1):
+        if (
+            theme_type == "light"
+            and self.pref in [0, 2]
+            or theme_type == "dark"
+            and self.pref == 1
+        ):
             self.on_theme_selected()
         else:
             self.save_prefs()
-            open_toast(self, (_(f"{theme_type.capitalize()} Theme Set To: " + theme_name.replace('.css', ''))))
+            open_toast(
+                self,
+                (
+                    _(
+                        f"{theme_type.capitalize()} Theme Set To: "
+                        + theme_name.replace(".css", "")
+                    )
+                ),
+            )
 
-        if(theme_type == "dark"):
+        if theme_type == "dark":
             flowbox_type = self.dark_flowbox
-        elif(theme_type == "light"):
+        elif theme_type == "light":
             flowbox_type = self.light_flowbox
 
         for flowbox in flowbox_type:
             for theme in flowbox:
                 theme.remove_css_class("active-scheme")
 
-        if(not button):
+        if not button:
             return
-        if(button.get_icon_name() != "reload-symbolic"):
+        if button.get_icon_name() != "reload-symbolic":
             button.add_css_class("active-scheme")
 
     def save_prefs(self):
@@ -276,7 +357,7 @@ class RewaitaWindow(Adw.ApplicationWindow):
             "window-controls": self.window_control,
             "modify-gtk3-theme": self.modify_gtk3_theme,
             "modify-gnome-shell": self.modify_gnome_shell,
-            "modify-cinnamon-shell": self.modify_gnome_shell,
+            "modify-cinnamon-shell": self.modify_cinnamon_shell,
             "run-in-background": self.run_in_background,
             "transparency": self.transparency,
             "window": self.borders,
@@ -288,7 +369,7 @@ class RewaitaWindow(Adw.ApplicationWindow):
             "dark-panel": self.dark_panel,
             "trans-panel": self.trans_panel,
             "no-pills": self.no_pills,
-            "accent": self.accent
+            "accent": self.accent,
         }
 
         prefs = Preferences()
